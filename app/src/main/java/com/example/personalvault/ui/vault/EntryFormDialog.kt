@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import com.example.personalvault.model.*
 import com.example.personalvault.ui.theme.*
 
@@ -247,6 +248,11 @@ fun EntryFormDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier
+            .fillMaxWidth(0.95f)
+            .fillMaxHeight(0.85f),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        shape = RoundedCornerShape(24.dp),
         containerColor = VaultBgSurface,
         title = {
             Text(
