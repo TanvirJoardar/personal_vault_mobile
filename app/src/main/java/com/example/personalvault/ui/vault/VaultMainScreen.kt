@@ -53,11 +53,14 @@ fun VaultMainScreen(
     if (showSettings) {
         SettingsScreen(
             currentAutoLock = meta?.autoLockMinutes ?: 5,
+            isBiometricEnabled = meta?.isBiometricEnabled ?: false,
             onAutoLockChange = { viewModel.updateAutoLock(it) },
-            onChangePassword = { viewModel.changePassword(it) },
+            onEnableBiometric = { masterPwd -> viewModel.enableBiometric(context, masterPwd) },
+            onDisableBiometric = { viewModel.disableBiometric(context) },
+            onChangePassword = { newPwd -> viewModel.changePassword(newPwd, context) },
             onExportBackup = { viewModel.exportBackup(it) },
             onImportBackup = { viewModel.importBackup(it) },
-            onWipeVault = { viewModel.wipeVault() },
+            onWipeVault = { viewModel.wipeVault(context) },
             onBack = { viewModel.closeSettings() }
         )
         return

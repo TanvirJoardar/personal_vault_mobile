@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -22,13 +23,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.personalvault.crypto.BiometricAuthManager
+import com.example.personalvault.crypto.BiometricStatus
 import com.example.personalvault.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     currentAutoLock: Int,
+    isBiometricEnabled: Boolean = false,
     onAutoLockChange: (Int) -> Unit,
+    onEnableBiometric: (masterPassword: String) -> Unit,
+    onDisableBiometric: () -> Unit,
     onChangePassword: (String) -> Unit,
     onExportBackup: ((String) -> Unit) -> Unit,
     onImportBackup: (String) -> Unit,
@@ -36,6 +42,7 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     var showChangePassDialog by remember { mutableStateOf(false) }
+    var showEnableBiometricDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
@@ -143,8 +150,9 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Security", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
+                    Text("Security & Authentication", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(12.dp))
+                    
                     Button(
                         onClick = { showChangePassDialog = true },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary),
@@ -153,6 +161,49 @@ fun SettingsScreen(
                         Icon(Icons.Default.LockReset, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Change Master Password")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = VaultBgRoot)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    val bioStatus = remember(context) { BiometricAuthManager.canAuthenticate(context) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Fingerprint,
+                            contentDescription = "Biometric Icon",
+                            tint = AccentSecondary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Biometric Unlock", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 15.sp)
+                            Text(
+                                text = when (bioStatus) {
+                                    BiometricStatus.AVAILABLE -> "Fingerprint / Face Unlock alternative"
+                                    BiometricStatus.NOT_ENROLLED -> "No fingerprint/face set up in system"
+                                    BiometricStatus.NO_HARDWARE -> "Biometric hardware unavailable"
+                                    BiometricStatus.UNAVAILABLE -> "Biometric hardware currently disabled"
+                                },
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                        }
+                        if (bioStatus == BiometricStatus.AVAILABLE) {
+                            Switch(
+                                checked = isBiometricEnabled,
+                                onCheckedChange = { checked ->
+                                    if (checked) {
+                                        showEnableBiometricDialog = true
+                                    } else {
+                                        onDisableBiometric()
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -355,6 +406,54 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showImportDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Enable Biometric Confirmation Dialog
+    if (showEnableBiometricDialog) {
+        var masterPassInput by remember { mutableStateOf("") }
+        var passErr by remember { mutableStateOf<String?>(null) }
+
+        AlertDialog(
+            onDismissRequest = { showEnableBiometricDialog = false },
+            containerColor = VaultBgSurface,
+            title = { Text("Enable Biometric Unlock") },
+            text = {
+                Column {
+                    Text(
+                        "Please enter your Master Password to authorize biometric unlock registration.",
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = masterPassInput,
+                        onValueChange = { masterPassInput = it; passErr = null },
+                        label = { Text("Master Password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (passErr != null) {
+                        Text(passErr!!, color = AccentDanger, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (masterPassInput.isBlank()) {
+                        passErr = "Password required"
+                    } else {
+                        onEnableBiometric(masterPassInput)
+                        showEnableBiometricDialog = false
+                    }
+                }) {
+                    Text("Enable Biometrics")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEnableBiometricDialog = false }) { Text("Cancel") }
             }
         )
     }

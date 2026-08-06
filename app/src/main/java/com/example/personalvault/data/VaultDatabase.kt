@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [VaultEntity::class, VaultMetaEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class VaultDatabase : RoomDatabase() {
@@ -24,7 +24,7 @@ abstract class VaultDatabase : RoomDatabase() {
                     context.applicationContext,
                     VaultDatabase::class.java,
                     "personal_vault.db"
-                ).build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }

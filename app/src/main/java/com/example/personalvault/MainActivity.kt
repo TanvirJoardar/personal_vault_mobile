@@ -2,10 +2,10 @@ package com.example.personalvault
 
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +27,7 @@ import com.example.personalvault.ui.theme.VaultBgRoot
 import com.example.personalvault.ui.vault.VaultMainScreen
 import com.example.personalvault.ui.vault.VaultViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: VaultViewModel by viewModels()
 
@@ -49,6 +49,7 @@ fun VaultAppContent(viewModel: VaultViewModel) {
     val isLoading by viewModel.isLoading.collectAsState()
     val toastMsg by viewModel.toastMessage.collectAsState()
     val recoveryPhrase by viewModel.generatedRecoveryPhrase.collectAsState()
+    val meta by viewModel.vaultMeta.collectAsState()
 
     val context = LocalContext.current
 
@@ -80,9 +81,10 @@ fun VaultAppContent(viewModel: VaultViewModel) {
 
             AppScreen.LOCK -> {
                 LockScreen(
+                    isBiometricEnabled = meta?.isBiometricEnabled ?: false,
                     onUnlock = { pwd -> viewModel.unlockVault(pwd) },
                     onNavigateToRecovery = { viewModel.navigateToRecovery() },
-                    onResetVault = { viewModel.wipeVault() }
+                    onResetVault = { viewModel.wipeVault(context) }
                 )
             }
 

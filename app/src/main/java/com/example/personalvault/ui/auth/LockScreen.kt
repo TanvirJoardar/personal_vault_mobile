@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -20,10 +22,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import com.example.personalvault.crypto.BiometricAuthManager
+import com.example.personalvault.crypto.BiometricStatus
 import com.example.personalvault.ui.theme.*
 
 @Composable
 fun LockScreen(
+    isBiometricEnabled: Boolean = false,
     onUnlock: (password: String) -> Unit,
     onNavigateToRecovery: () -> Unit,
     onResetVault: () -> Unit
@@ -31,6 +37,30 @@ fun LockScreen(
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
+    var biometricErrorMsg by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val fragmentActivity = context as? FragmentActivity
+
+    val canUseBiometrics = remember(isBiometricEnabled) {
+        isBiometricEnabled &&
+                BiometricAuthManager.canAuthenticate(context) == BiometricStatus.AVAILABLE &&
+                BiometricAuthManager.hasSavedCredentials(context)
+    }
+
+    fun launchBiometricPrompt() {
+        if (fragmentActivity != null && canUseBiometrics) {
+            BiometricAuthManager.promptBiometricUnlock(
+                activity = fragmentActivity,
+                onSuccess = { masterPassword ->
+                    onUnlock(masterPassword)
+                },
+                onError = { err ->
+                    biometricErrorMsg = err
+                }
+            )
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -110,6 +140,27 @@ fun LockScreen(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("Unlock Vault", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+
+                if (canUseBiometrics) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { launchBiometricPrompt() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentSecondary)
+                    ) {
+                        Icon(Icons.Default.Fingerprint, contentDescription = "Biometric Unlock", modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Unlock with Biometrics (Fingerprint / Face)", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                if (biometricErrorMsg != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(biometricErrorMsg!!, color = AccentDanger, fontSize = 12.sp)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

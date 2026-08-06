@@ -1,8 +1,10 @@
 package com.example.personalvault.ui.vault
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.personalvault.crypto.BiometricAuthManager
 import com.example.personalvault.data.VaultDatabase
 import com.example.personalvault.data.VaultMetaEntity
 import com.example.personalvault.data.VaultRepository
@@ -226,14 +228,37 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun changePassword(newPassword: String) {
+    fun changePassword(newPassword: String, context: Context? = null) {
         viewModelScope.launch {
             try {
                 repository.changeMasterPassword(newPassword)
+                if (context != null && vaultMeta.value?.isBiometricEnabled == true) {
+                    BiometricAuthManager.saveEncryptedMasterPassword(context, newPassword)
+                }
                 showToast("Master password updated successfully")
             } catch (e: Exception) {
                 showToast("Error updating password: ${e.localizedMessage}")
             }
+        }
+    }
+
+    fun enableBiometric(context: Context, masterPassword: String) {
+        viewModelScope.launch {
+            val success = BiometricAuthManager.saveEncryptedMasterPassword(context, masterPassword)
+            if (success) {
+                repository.updateBiometricEnabled(true)
+                showToast("Biometric unlock enabled successfully")
+            } else {
+                showToast("Failed to save biometric key")
+            }
+        }
+    }
+
+    fun disableBiometric(context: Context) {
+        viewModelScope.launch {
+            BiometricAuthManager.clearBiometricData(context)
+            repository.updateBiometricEnabled(false)
+            showToast("Biometric unlock disabled")
         }
     }
 
@@ -267,8 +292,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun wipeVault() {
+    fun wipeVault(context: Context? = null) {
         viewModelScope.launch {
+            if (context != null) {
+                BiometricAuthManager.clearBiometricData(context)
+            }
             repository.wipeVault()
             _screen.value = AppScreen.SETUP
             closeSettings()

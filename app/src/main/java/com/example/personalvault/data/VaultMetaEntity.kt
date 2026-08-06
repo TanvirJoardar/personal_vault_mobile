@@ -14,5 +14,6 @@ data class VaultMetaEntity(
     val recoveryEncryptedVaultKey: String,
     val recoveryEncryptedVaultKeyIV: String,
     val recoveryEmailHint: String = "",
-    val autoLockMinutes: Int = 5
+    val autoLockMinutes: Int = 5,
+    val isBiometricEnabled: Boolean = false
 )

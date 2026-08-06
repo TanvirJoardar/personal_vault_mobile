@@ -151,6 +151,12 @@ class VaultRepository(private val dao: VaultDao) {
         dao.saveVaultMeta(updatedMeta)
     }
 
+    suspend fun updateBiometricEnabled(enabled: Boolean) {
+        val meta = dao.getVaultMetaDirect() ?: return
+        val updatedMeta = meta.copy(isBiometricEnabled = enabled)
+        dao.saveVaultMeta(updatedMeta)
+    }
+
     suspend fun exportVaultJson(): String {
         val entities = dao.getAllEntriesDirectList()
         val exportList = entities.map {
