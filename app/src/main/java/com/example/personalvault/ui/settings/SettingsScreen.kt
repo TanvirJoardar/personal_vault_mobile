@@ -73,6 +73,47 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Database Storage", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    val dbSizeText = remember(context) {
+                        try {
+                            val dbFile = context.getDatabasePath("vault_database.db")
+                            val walFile = context.getDatabasePath("vault_database.db-wal")
+                            val shmFile = context.getDatabasePath("vault_database.db-shm")
+                            var totalBytes = 0L
+                            if (dbFile.exists()) totalBytes += dbFile.length()
+                            if (walFile.exists()) totalBytes += walFile.length()
+                            if (shmFile.exists()) totalBytes += shmFile.length()
+                            
+                            if (totalBytes < 1024) "$totalBytes B"
+                            else if (totalBytes < 1024 * 1024) "%.2f KB".format(totalBytes / 1024.0)
+                            else "%.2f MB".format(totalBytes / (1024.0 * 1024.0))
+                        } catch (e: Exception) {
+                            "Unknown"
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Occupied Vault DB Space", color = TextSecondary, fontSize = 13.sp)
+                        Text(dbSizeText, color = AccentPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Auto-lock timer section
+            Card(
+                colors = CardDefaults.cardColors(containerColor = VaultBgSurface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text("Auto-Lock Inactivity Timeout", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     listOf(1, 5, 15, 0).forEach { mins ->

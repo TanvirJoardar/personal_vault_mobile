@@ -25,10 +25,12 @@ import com.example.personalvault.ui.theme.*
 @Composable
 fun LockScreen(
     onUnlock: (password: String) -> Unit,
-    onNavigateToRecovery: () -> Unit
+    onNavigateToRecovery: () -> Unit,
+    onResetVault: () -> Unit
 ) {
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
+    var showResetConfirmDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -115,7 +117,36 @@ fun LockScreen(
                 TextButton(onClick = onNavigateToRecovery) {
                     Text("Forgot Password? Use Recovery Key", color = AccentSecondary, fontSize = 13.sp)
                 }
+
+                TextButton(onClick = { showResetConfirmDialog = true }) {
+                    Text("Create New Master Data", color = TextSecondary, fontSize = 12.sp)
+                }
             }
         }
+    }
+
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            containerColor = VaultBgSurface,
+            title = { Text("Create New Master Data?", color = AccentDanger, fontWeight = FontWeight.Bold) },
+            text = { Text("Creating new master data will erase and reset all existing vault data. Are you sure you want to proceed?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        onResetVault()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentDanger)
+                ) {
+                    Text("Reset & Create New")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirmDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
     }
 }

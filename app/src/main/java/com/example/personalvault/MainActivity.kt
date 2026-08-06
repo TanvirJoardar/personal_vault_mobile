@@ -81,7 +81,8 @@ fun VaultAppContent(viewModel: VaultViewModel) {
             AppScreen.LOCK -> {
                 LockScreen(
                     onUnlock = { pwd -> viewModel.unlockVault(pwd) },
-                    onNavigateToRecovery = { viewModel.navigateToRecovery() }
+                    onNavigateToRecovery = { viewModel.navigateToRecovery() },
+                    onResetVault = { viewModel.wipeVault() }
                 )
             }
 

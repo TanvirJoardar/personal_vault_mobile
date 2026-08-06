@@ -72,7 +72,8 @@ data class BankCard(
     val expiryDate: String = "",
     val pin: String = "",
     val cvv: String = "",
-    val cardImage: EncryptedFileAttachment? = null
+    val cardImage: EncryptedFileAttachment? = null,
+    val attachments: List<EncryptedFileAttachment> = emptyList()
 )
 
 @Serializable

@@ -1,17 +1,32 @@
 package com.example.personalvault.ui.vault
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -38,6 +53,7 @@ fun EntryFormDialog(
     var passwordUsername by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.username ?: "") }
     var passwordValue by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.passwordValue ?: "") }
     var passwordUrl by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.url ?: "") }
+    var passwordProvider by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.signInProvider ?: SignInProvider.NONE) }
     var passwordCategory by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.category ?: "General") }
     var passwordIsFavorite by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.isFavorite ?: false) }
     var passwordNotes by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.additionalInfo ?: "") }
@@ -81,14 +97,153 @@ fun EntryFormDialog(
     var bankHolder by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.accountHolderName ?: "") }
     var bankRouting by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.routingNumber ?: "") }
     var bankSwift by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.swiftCode ?: "") }
+    var bankIfsc by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.ifscCode ?: "") }
     var bankNotes by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.additionalInfo ?: "") }
+    var bankSignature by remember { mutableStateOf<EncryptedFileAttachment?>((editingEntry as? VaultEntry.Bank)?.signatureFile) }
+    var bankCards by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.cards ?: emptyList()) }
 
-    // Bank Card sub-entry
-    var cardNum by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.cards?.firstOrNull()?.cardNumber ?: "") }
-    var cardHolder by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.cards?.firstOrNull()?.cardHolderName ?: "") }
-    var cardExpiry by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.cards?.firstOrNull()?.expiryDate ?: "") }
-    var cardCvv by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.cards?.firstOrNull()?.cvv ?: "") }
-    var cardPin by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.cards?.firstOrNull()?.pin ?: "") }
+    val context = LocalContext.current
+
+    var attachedFiles by remember {
+        mutableStateOf<List<EncryptedFileAttachment>>(
+            when (editingEntry) {
+                is VaultEntry.Password -> editingEntry.attachments
+                is VaultEntry.Document -> editingEntry.files
+                is VaultEntry.DrivingLicense -> editingEntry.files
+                is VaultEntry.Certificate -> editingEntry.files
+                is VaultEntry.IdCard -> editingEntry.files
+                is VaultEntry.Bank -> editingEntry.signatureFile?.let { listOf(it) } ?: emptyList()
+                null -> emptyList()
+            }
+        )
+    }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val contentResolver = context.contentResolver
+                val inputStream = contentResolver.openInputStream(uri)
+                val bytes = inputStream?.readBytes()
+                inputStream?.close()
+
+                if (bytes != null) {
+                    var fileName = "attachment_${System.currentTimeMillis()}"
+                    val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+
+                    contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (nameIndex != -1) {
+                                fileName = cursor.getString(nameIndex)
+                            }
+                        }
+                    }
+
+                    val base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    val attachment = EncryptedFileAttachment(
+                        fileName = fileName,
+                        mimeType = mimeType,
+                        size = bytes.size.toLong(),
+                        encryptedData = base64Data,
+                        iv = ""
+                    )
+                    attachedFiles = attachedFiles + attachment
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val signaturePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val contentResolver = context.contentResolver
+                val inputStream = contentResolver.openInputStream(uri)
+                val bytes = inputStream?.readBytes()
+                inputStream?.close()
+
+                if (bytes != null) {
+                    var fileName = "signature_${System.currentTimeMillis()}"
+                    val mimeType = contentResolver.getType(uri) ?: "image/png"
+
+                    contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (nameIndex != -1) {
+                                fileName = cursor.getString(nameIndex)
+                            }
+                        }
+                    }
+
+                    val base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    bankSignature = EncryptedFileAttachment(
+                        fileName = fileName,
+                        mimeType = mimeType,
+                        size = bytes.size.toLong(),
+                        encryptedData = base64Data,
+                        iv = ""
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    var cardTargetIndexForPicker by remember { mutableStateOf<Int?>(null) }
+
+    val cardImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val targetIdx = cardTargetIndexForPicker
+            if (targetIdx != null && targetIdx in bankCards.indices) {
+                try {
+                    val contentResolver = context.contentResolver
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val bytes = inputStream?.readBytes()
+                    inputStream?.close()
+
+                    if (bytes != null) {
+                        var fileName = "card_${System.currentTimeMillis()}"
+                        val mimeType = contentResolver.getType(uri) ?: "image/png"
+
+                        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                if (nameIndex != -1) {
+                                    fileName = cursor.getString(nameIndex)
+                                }
+                            }
+                        }
+
+                        val base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                        val attachment = EncryptedFileAttachment(
+                            fileName = fileName,
+                            mimeType = mimeType,
+                            size = bytes.size.toLong(),
+                            encryptedData = base64Data,
+                            iv = ""
+                        )
+                        val targetCard = bankCards[targetIdx]
+                        val updatedCard = targetCard.copy(
+                            attachments = targetCard.attachments + attachment
+                        )
+                        bankCards = bankCards.toMutableList().apply {
+                            this[targetIdx] = updatedCard
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -112,14 +267,15 @@ fun EntryFormDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SectionType.values().forEach { sec ->
                             FilterChip(
                                 selected = selectedSection == sec,
                                 onClick = { selectedSection = sec },
-                                label = { Text(sec.label, fontSize = 11.sp) },
+                                label = { Text(sec.label, fontSize = 12.sp, maxLines = 1) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = AccentPrimary,
                                     selectedLabelColor = TextPrimary
@@ -186,6 +342,48 @@ fun EntryFormDialog(
                             shape = RoundedCornerShape(12.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        Text("Sign-in Method", fontSize = 12.sp, color = TextSecondary)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            SignInProvider.values().forEach { provider ->
+                                FilterChip(
+                                    selected = passwordProvider == provider,
+                                    onClick = { passwordProvider = provider },
+                                    label = {
+                                        Text(
+                                            when (provider) {
+                                                SignInProvider.NONE -> "Direct / Password"
+                                                SignInProvider.GOOGLE -> "Google"
+                                                SignInProvider.MICROSOFT -> "Microsoft"
+                                                SignInProvider.FACEBOOK -> "Facebook"
+                                                SignInProvider.APPLE -> "Apple"
+                                            },
+                                            fontSize = 11.sp
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = AccentPrimary,
+                                        selectedLabelColor = TextPrimary
+                                    )
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = passwordNotes,
+                            onValueChange = { passwordNotes = it },
+                            label = { Text("Additional Info / Notes") },
+                            minLines = 2,
+                            maxLines = 4,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(
                                 checked = passwordIsFavorite,
@@ -204,6 +402,27 @@ fun EntryFormDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Document Type", fontSize = 12.sp, color = TextSecondary)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            DocumentType.values().forEach { type ->
+                                FilterChip(
+                                    selected = docType == type,
+                                    onClick = { docType = type },
+                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = AccentPrimary,
+                                        selectedLabelColor = TextPrimary
+                                    )
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = docDesc,
@@ -251,6 +470,27 @@ fun EntryFormDialog(
                             shape = RoundedCornerShape(12.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        Text("License Type", fontSize = 12.sp, color = TextSecondary)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            LicenseType.values().forEach { type ->
+                                FilterChip(
+                                    selected = licType == type,
+                                    onClick = { licType = type },
+                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = AccentPrimary,
+                                        selectedLabelColor = TextPrimary
+                                    )
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
                                 value = licIssue,
@@ -281,6 +521,27 @@ fun EntryFormDialog(
                             shape = RoundedCornerShape(12.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        Text("Certificate Type", fontSize = 12.sp, color = TextSecondary)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            CertificateType.values().forEach { type ->
+                                FilterChip(
+                                    selected = certType == type,
+                                    onClick = { certType = type },
+                                    label = { Text(type.name, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = AccentPrimary,
+                                        selectedLabelColor = TextPrimary
+                                    )
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = certInst,
                             onValueChange = { certInst = it },
@@ -298,17 +559,48 @@ fun EntryFormDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = certDesc,
+                            onValueChange = { certDesc = it },
+                            label = { Text("Description / Details") },
+                            minLines = 2,
+                            maxLines = 4,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
                     }
 
                     SectionType.ID_CARD -> {
                         OutlinedTextField(
                             value = idName,
                             onValueChange = { idName = it },
-                            label = { Text("ID Card Title *") },
+                            label = { Text("ID Card Title / Card Name *") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Card Type", fontSize = 12.sp, color = TextSecondary)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            IdCardType.values().forEach { type ->
+                                FilterChip(
+                                    selected = idType == type,
+                                    onClick = { idType = type },
+                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = AccentPrimary,
+                                        selectedLabelColor = TextPrimary
+                                    )
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = idNumber,
@@ -327,6 +619,35 @@ fun EntryFormDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = idIssue,
+                                onValueChange = { idIssue = it },
+                                label = { Text("Issue Date") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            OutlinedTextField(
+                                value = idExpiry,
+                                onValueChange = { idExpiry = it },
+                                label = { Text("Expiry Date") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = idDesc,
+                            onValueChange = { idDesc = it },
+                            label = { Text("Description / Details") },
+                            minLines = 2,
+                            maxLines = 4,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
                     }
 
                     SectionType.BANK -> {
@@ -339,15 +660,39 @@ fun EntryFormDialog(
                             shape = RoundedCornerShape(12.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+
+                        Text("Account Type", fontSize = 12.sp, color = TextSecondary)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            BankAccountType.values().forEach { type ->
+                                FilterChip(
+                                    selected = bankType == type,
+                                    onClick = { bankType = type },
+                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = AccentPrimary,
+                                        selectedLabelColor = TextPrimary
+                                    )
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         OutlinedTextField(
-                            value = bankHolder,
-                            onValueChange = { bankHolder = it },
-                            label = { Text("Account Holder Name") },
+                            value = bankBranch,
+                            onValueChange = { bankBranch = it },
+                            label = { Text("Branch Name") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+
                         OutlinedTextField(
                             value = bankAccountNum,
                             onValueChange = { bankAccountNum = it },
@@ -357,32 +702,369 @@ fun EntryFormDialog(
                             shape = RoundedCornerShape(12.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+
                         OutlinedTextField(
-                            value = cardNum,
-                            onValueChange = { cardNum = it },
-                            label = { Text("Card Number (Optional)") },
+                            value = bankHolder,
+                            onValueChange = { bankHolder = it },
+                            label = { Text("Account Holder Name") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
-                                value = cardExpiry,
-                                onValueChange = { cardExpiry = it },
-                                label = { Text("Expiry") },
+                                value = bankRouting,
+                                onValueChange = { bankRouting = it },
+                                label = { Text("Routing Number") },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp)
                             )
                             OutlinedTextField(
-                                value = cardCvv,
-                                onValueChange = { cardCvv = it },
-                                label = { Text("CVV") },
+                                value = bankSwift,
+                                onValueChange = { bankSwift = it },
+                                label = { Text("SWIFT Code") },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp)
                             )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = bankIfsc,
+                            onValueChange = { bankIfsc = it },
+                            label = { Text("IFSC Code") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = bankNotes,
+                            onValueChange = { bankNotes = it },
+                            label = { Text("Additional Info / Notes") },
+                            minLines = 2,
+                            maxLines = 4,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Bank Signature Attachment
+                        Text("Bank Signature", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        if (bankSignature == null) {
+                            OutlinedButton(
+                                onClick = { signaturePickerLauncher.launch("image/*") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Upload Bank Signature / File")
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(VaultBgCard, RoundedCornerShape(10.dp))
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Default.Image, contentDescription = null, tint = AccentPrimary, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(bankSignature?.fileName ?: "Signature", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+                                        Text("${(bankSignature?.size ?: 0) / 1024} KB", fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                }
+                                IconButton(onClick = { bankSignature = null }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Bank Cards Section
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CreditCard, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Bank Cards", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
+                            }
+                            Button(
+                                onClick = {
+                                    bankCards = bankCards + BankCard()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Card", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add Card", fontSize = 12.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (bankCards.isEmpty()) {
+                            Text("No bank cards added yet. Click 'Add Card' to attach a card.", fontSize = 12.sp, color = TextSecondary)
+                        } else {
+                            bankCards.forEachIndexed { index, card ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 6.dp)
+                                        .background(VaultBgCard, RoundedCornerShape(12.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Card #${index + 1}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                                        IconButton(
+                                            onClick = {
+                                                bankCards = bankCards.toMutableList().apply { removeAt(index) }
+                                            }
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Remove Card", tint = TextSecondary, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        var expanded by remember { mutableStateOf(false) }
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            OutlinedTextField(
+                                                value = card.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                label = { Text("Card Type") },
+                                                trailingIcon = {
+                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .matchParentSize()
+                                                    .clickable { expanded = true }
+                                            )
+                                            DropdownMenu(
+                                                expanded = expanded,
+                                                onDismissRequest = { expanded = false }
+                                            ) {
+                                                BankCardType.values().forEach { type ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }) },
+                                                        onClick = {
+                                                            bankCards = bankCards.toMutableList().apply {
+                                                                this[index] = card.copy(cardType = type)
+                                                            }
+                                                            expanded = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        OutlinedTextField(
+                                            value = card.cardNumber,
+                                            onValueChange = { newNum ->
+                                                bankCards = bankCards.toMutableList().apply {
+                                                    this[index] = card.copy(cardNumber = newNum)
+                                                }
+                                            },
+                                            label = { Text("Card Number") },
+                                            placeholder = { Text("XXXX-XXXX-XXXX-XXXX") },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(
+                                            value = card.pin,
+                                            onValueChange = { newPin ->
+                                                bankCards = bankCards.toMutableList().apply {
+                                                    this[index] = card.copy(pin = newPin)
+                                                }
+                                            },
+                                            label = { Text("PIN") },
+                                            placeholder = { Text("....") },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+
+                                        OutlinedTextField(
+                                            value = card.cvv,
+                                            onValueChange = { newCvv ->
+                                                bankCards = bankCards.toMutableList().apply {
+                                                    this[index] = card.copy(cvv = newCvv)
+                                                }
+                                            },
+                                            label = { Text("CVV") },
+                                            placeholder = { Text("...") },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    OutlinedTextField(
+                                        value = card.expiryDate,
+                                        onValueChange = { newExp ->
+                                            bankCards = bankCards.toMutableList().apply {
+                                                this[index] = card.copy(expiryDate = newExp)
+                                            }
+                                        },
+                                        label = { Text("Expiry Date") },
+                                        placeholder = { Text("MM/YY") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Card Images & Scans (Front / Back)", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextSecondary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            cardTargetIndexForPicker = index
+                                            cardImagePickerLauncher.launch("image/*")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Upload Card Image / Scan", fontSize = 12.sp)
+                                    }
+
+                                    val cardFiles = listOfNotNull(card.cardImage) + card.attachments
+                                    if (cardFiles.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        cardFiles.forEach { file ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 2.dp)
+                                                    .background(VaultBgSurface, RoundedCornerShape(8.dp))
+                                                     .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                    Icon(
+                                                        imageVector = if (file.mimeType.startsWith("image/")) Icons.Default.Image else Icons.Default.AttachFile,
+                                                        contentDescription = null,
+                                                        tint = AccentPrimary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Column {
+                                                        Text(file.fileName, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextPrimary, maxLines = 1)
+                                                        Text("${file.size / 1024} KB", fontSize = 9.sp, color = TextSecondary)
+                                                    }
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        val newAttachments = card.attachments.toMutableList()
+                                                        if (file == card.cardImage) {
+                                                            bankCards = bankCards.toMutableList().apply {
+                                                                this[index] = card.copy(cardImage = null)
+                                                            }
+                                                        } else {
+                                                            newAttachments.remove(file)
+                                                            bankCards = bankCards.toMutableList().apply {
+                                                                this[index] = card.copy(attachments = newAttachments)
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (selectedSection != SectionType.BANK) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = VaultBgCard)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Attachments & Scans (Optional)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+
+                    OutlinedButton(
+                        onClick = { filePickerLauncher.launch("*/*") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.AttachFile, contentDescription = "Attach File")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Upload File / Document / Image Scan")
+                    }
+
+                    if (attachedFiles.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier.padding(top = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            attachedFiles.forEachIndexed { index, file ->
+                                Surface(
+                                    color = VaultBgCard,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Icon(
+                                            imageVector = if (file.mimeType.startsWith("image/")) Icons.Default.Image else Icons.Default.AttachFile,
+                                            contentDescription = null,
+                                            tint = AccentPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(file.fileName, fontSize = 12.sp, color = TextPrimary, maxLines = 1)
+                                            Text("${file.size / 1024} KB", fontSize = 10.sp, color = TextSecondary)
+                                        }
+                                        IconButton(
+                                            onClick = { attachedFiles = attachedFiles.filterIndexed { i, _ -> i != index } },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = "Remove", tint = AccentDanger, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -402,9 +1084,11 @@ fun EntryFormDialog(
                                 username = passwordUsername,
                                 passwordValue = passwordValue,
                                 url = passwordUrl,
+                                signInProvider = passwordProvider,
                                 category = passwordCategory,
                                 isFavorite = passwordIsFavorite,
-                                additionalInfo = passwordNotes
+                                additionalInfo = passwordNotes,
+                                attachments = attachedFiles
                             )
                         }
                         SectionType.DOCUMENT -> {
@@ -416,7 +1100,8 @@ fun EntryFormDialog(
                                 documentName = docName,
                                 documentType = docType,
                                 description = docDesc,
-                                tags = docTags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                tags = docTags.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                files = attachedFiles
                             )
                         }
                         SectionType.DRIVING_LICENSE -> {
@@ -430,7 +1115,8 @@ fun EntryFormDialog(
                                 licenseNumber = licNumber,
                                 licenseType = licType,
                                 issueDate = licIssue,
-                                expiryDate = licExpiry
+                                expiryDate = licExpiry,
+                                files = attachedFiles
                             )
                         }
                         SectionType.CERTIFICATE -> {
@@ -443,7 +1129,8 @@ fun EntryFormDialog(
                                 certificateType = certType,
                                 institutionName = certInst,
                                 yearOfCompletion = certYear,
-                                description = certDesc
+                                description = certDesc,
+                                files = attachedFiles
                             )
                         }
                         SectionType.ID_CARD -> {
@@ -458,21 +1145,13 @@ fun EntryFormDialog(
                                 holderName = idHolder,
                                 issueDate = idIssue,
                                 expiryDate = idExpiry,
-                                description = idDesc
+                                description = idDesc,
+                                files = attachedFiles
                             )
                         }
                         SectionType.BANK -> {
                             if (bankName.isBlank()) null
                             else {
-                                val cardsList = if (cardNum.isNotBlank()) listOf(
-                                    BankCard(
-                                        cardNumber = cardNum,
-                                        cardHolderName = cardHolder,
-                                        expiryDate = cardExpiry,
-                                        cvv = cardCvv,
-                                        pin = cardPin
-                                    )
-                                ) else emptyList()
                                 VaultEntry.Bank(
                                     id = editingEntry?.id ?: java.util.UUID.randomUUID().toString(),
                                     createdAt = editingEntry?.createdAt ?: System.currentTimeMillis(),
@@ -484,8 +1163,10 @@ fun EntryFormDialog(
                                     accountHolderName = bankHolder,
                                     routingNumber = bankRouting,
                                     swiftCode = bankSwift,
+                                    ifscCode = bankIfsc,
                                     additionalInfo = bankNotes,
-                                    cards = cardsList
+                                    signatureFile = bankSignature,
+                                    cards = bankCards
                                 )
                             }
                         }

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.personalvault.model.*
 import com.example.personalvault.ui.settings.SettingsScreen
 import com.example.personalvault.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +47,9 @@ fun VaultMainScreen(
     var viewingDetailEntry by remember { mutableStateOf<VaultEntry?>(null) }
     val context = LocalContext.current
 
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val coroutineScope = rememberCoroutineScope()
+
     if (showSettings) {
         SettingsScreen(
             currentAutoLock = meta?.autoLockMinutes ?: 5,
@@ -59,45 +63,134 @@ fun VaultMainScreen(
         return
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = AccentPrimary.copy(alpha = 0.2f),
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Lock, contentDescription = null, tint = AccentPrimary, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text("Personal Vault", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
-                            Text("Zero-Knowledge Storage", fontSize = 11.sp, color = TextSecondary)
-                        }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = VaultBgSurface,
+                drawerContentColor = TextPrimary
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(280.dp)
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 20.dp, top = 12.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = AccentPrimary, modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Vault Navigation", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextPrimary)
                     }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.toggleFavoritesFilter() }) {
-                        Icon(
-                            imageVector = if (onlyFavorites) Icons.Default.Star else Icons.Outlined.StarBorder,
-                            contentDescription = "Favorites",
-                            tint = if (onlyFavorites) AccentWarning else TextSecondary
+
+                    HorizontalDivider(color = VaultBgCard)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    NavigationDrawerItem(
+                        label = { Text("All Vault Items") },
+                        selected = selectedSection == null,
+                        onClick = {
+                            viewModel.setSection(null)
+                            coroutineScope.launch { drawerState.close() }
+                        },
+                        icon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            selectedContainerColor = AccentPrimary.copy(alpha = 0.2f),
+                            selectedIconColor = AccentPrimary,
+                            selectedTextColor = AccentPrimary
+                        )
+                    )
+
+                    SectionType.values().forEach { sec ->
+                        val color = getSectionColor(sec)
+                        val icon = getSectionIcon(sec)
+                        NavigationDrawerItem(
+                            label = { Text(sec.label) },
+                            selected = selectedSection == sec,
+                            onClick = {
+                                viewModel.setSection(sec)
+                                coroutineScope.launch { drawerState.close() }
+                            },
+                            icon = { Icon(icon, contentDescription = null, tint = if (selectedSection == sec) color else TextSecondary) },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                selectedContainerColor = color.copy(alpha = 0.2f),
+                                selectedTextColor = color
+                            )
                         )
                     }
-                    IconButton(onClick = { viewModel.openSettings() }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextSecondary)
-                    }
-                    IconButton(onClick = { viewModel.lockVault() }) {
-                        Icon(Icons.Default.Lock, contentDescription = "Lock", tint = AccentDanger)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = VaultBgPrimary)
-            )
-        },
+
+                    Spacer(modifier = Modifier.weight(1f))
+                    HorizontalDivider(color = VaultBgCard)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    NavigationDrawerItem(
+                        label = { Text("Settings") },
+                        selected = false,
+                        onClick = {
+                            viewModel.openSettings()
+                            coroutineScope.launch { drawerState.close() }
+                        },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = TextSecondary) }
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Lock Vault") },
+                        selected = false,
+                        onClick = {
+                            viewModel.lockVault()
+                            coroutineScope.launch { drawerState.close() }
+                        },
+                        icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = AccentDanger) }
+                    )
+                }
+            }
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu Sidebar", tint = TextPrimary)
+                        }
+                    },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = AccentPrimary.copy(alpha = 0.2f),
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Lock, contentDescription = null, tint = AccentPrimary, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Personal Vault", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                                Text("Zero-Knowledge Storage", fontSize = 10.sp, color = TextSecondary)
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.toggleFavoritesFilter() }) {
+                            Icon(
+                                imageVector = if (onlyFavorites) Icons.Default.Star else Icons.Outlined.StarBorder,
+                                contentDescription = "Favorites",
+                                tint = if (onlyFavorites) AccentWarning else TextSecondary
+                            )
+                        }
+                        IconButton(onClick = { viewModel.openSettings() }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextSecondary)
+                        }
+                        IconButton(onClick = { viewModel.lockVault() }) {
+                            Icon(Icons.Default.Lock, contentDescription = "Lock", tint = AccentDanger)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = VaultBgPrimary)
+                )
+            },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.openEntryForm(null) },
@@ -224,6 +317,8 @@ fun VaultMainScreen(
                 }
             }
         }
+    }
+
     }
 
     // Detail Dialog

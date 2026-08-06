@@ -3,6 +3,9 @@ package com.example.personalvault.ui.vault
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,6 +17,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -89,7 +94,11 @@ fun EntryDetailDialog(
                         DetailItem("Username / Email", entry.username, context)
                         DetailItem("Password", entry.passwordValue, context, isSensitive = true, isHidden = !showSensitiveData)
                         DetailItem("URL", entry.url, context)
-                        DetailItem("Notes", entry.additionalInfo, context)
+                        if (entry.signInProvider != SignInProvider.NONE) {
+                            DetailItem("Sign-in Method", entry.signInProvider.name.lowercase().replaceFirstChar { it.uppercase() }, context)
+                        }
+                        DetailItem("Additional Info / Notes", entry.additionalInfo, context)
+                        RenderAttachments(entry.attachments)
                     }
                     is VaultEntry.Document -> {
                         DetailItem("Document Name", entry.documentName, context)
@@ -98,6 +107,7 @@ fun EntryDetailDialog(
                         if (entry.tags.isNotEmpty()) {
                             DetailItem("Tags", entry.tags.joinToString(", "), context)
                         }
+                        RenderAttachments(entry.files)
                     }
                     is VaultEntry.DrivingLicense -> {
                         DetailItem("License Name", entry.licenseName, context)
@@ -105,34 +115,68 @@ fun EntryDetailDialog(
                         DetailItem("License Number", entry.licenseNumber, context, isSensitive = true, isHidden = !showSensitiveData)
                         DetailItem("Issue Date", entry.issueDate, context)
                         DetailItem("Expiry Date", entry.expiryDate, context)
+                        RenderAttachments(entry.files)
                     }
                     is VaultEntry.Certificate -> {
                         DetailItem("Certificate Name", entry.certificateName, context)
                         DetailItem("Institution", entry.institutionName, context)
                         DetailItem("Completion Year", entry.yearOfCompletion, context)
                         DetailItem("Description", entry.description, context)
+                        RenderAttachments(entry.files)
                     }
                     is VaultEntry.IdCard -> {
                         DetailItem("ID Name", entry.cardName, context)
+                        DetailItem("Card Type", entry.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, context)
                         DetailItem("Holder Name", entry.holderName, context)
                         DetailItem("Card Number", entry.cardNumber, context, isSensitive = true, isHidden = !showSensitiveData)
                         DetailItem("Issue Date", entry.issueDate, context)
                         DetailItem("Expiry Date", entry.expiryDate, context)
+                        DetailItem("Description", entry.description, context)
+                        RenderAttachments(entry.files)
                     }
                     is VaultEntry.Bank -> {
                         DetailItem("Bank Name", entry.bankName, context)
-                        DetailItem("Account Holder", entry.accountHolderName, context)
-                        DetailItem("Account Number", entry.accountNumber, context, isSensitive = true, isHidden = !showSensitiveData)
+                        DetailItem("Account Type", entry.bankType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, context)
                         DetailItem("Branch Name", entry.branchName, context)
+                        DetailItem("Account Number", entry.accountNumber, context, isSensitive = true, isHidden = !showSensitiveData)
+                        DetailItem("Account Holder", entry.accountHolderName, context)
                         DetailItem("Routing Number", entry.routingNumber, context)
                         DetailItem("SWIFT Code", entry.swiftCode, context)
+                        DetailItem("IFSC Code", entry.ifscCode, context)
+                        DetailItem("Notes", entry.additionalInfo, context)
 
-                        entry.cards.forEachIndexed { index, card ->
+                        if (entry.cards.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Bank Cards (${entry.cards.size})", fontWeight = FontWeight.Bold, color = AccentSecondary, fontSize = 14.sp)
+                            entry.cards.forEachIndexed { index, card ->
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(VaultBgCard, RoundedCornerShape(10.dp))
+                                        .padding(10.dp)
+                                ) {
+                                    Text("Card #${index + 1} (${card.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }})", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
+                                    DetailItem("Card Number", card.cardNumber, context, isSensitive = true, isHidden = !showSensitiveData)
+                                    DetailItem("PIN", card.pin, context, isSensitive = true, isHidden = !showSensitiveData)
+                                    DetailItem("CVV", card.cvv, context, isSensitive = true, isHidden = !showSensitiveData)
+                                    DetailItem("Expiry Date", card.expiryDate, context)
+
+                                    val cardFiles = listOfNotNull(card.cardImage) + card.attachments
+                                    if (cardFiles.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text("Card Scans & Images", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                        RenderAttachments(cardFiles)
+                                    }
+                                }
+                            }
+                        }
+
+                        val bankFiles = listOfNotNull(entry.signatureFile)
+                        if (bankFiles.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Associated Card #${index + 1}", fontWeight = FontWeight.Bold, color = AccentSecondary, fontSize = 13.sp)
-                            DetailItem("Card Number", card.cardNumber, context, isSensitive = true, isHidden = !showSensitiveData)
-                            DetailItem("Expiry / CVV", "${card.expiryDate} / ${if (showSensitiveData) card.cvv else "***"}", context)
-                            DetailItem("PIN", card.pin, context, isSensitive = true, isHidden = !showSensitiveData)
+                            Text("Bank Signature / File", fontWeight = FontWeight.Bold, color = TextSecondary, fontSize = 12.sp)
+                            RenderAttachments(bankFiles)
                         }
                     }
                 }
@@ -208,6 +252,69 @@ private fun DetailItem(
                     tint = TextSecondary,
                     modifier = Modifier.size(18.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderAttachments(files: List<EncryptedFileAttachment>) {
+    if (files.isEmpty()) return
+
+    Spacer(modifier = Modifier.height(12.dp))
+    HorizontalDivider(color = VaultBgCard)
+    Spacer(modifier = Modifier.height(8.dp))
+    Text("Attached Files & Images", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AccentPrimary)
+
+    files.forEach { file ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .background(VaultBgCard, RoundedCornerShape(10.dp))
+                .padding(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        imageVector = if (file.mimeType.startsWith("image/")) Icons.Default.Image else Icons.Default.AttachFile,
+                        contentDescription = null,
+                        tint = AccentPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(file.fileName, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+                        Text("${file.size / 1024} KB", fontSize = 10.sp, color = TextSecondary)
+                    }
+                }
+            }
+
+            if (file.mimeType.startsWith("image/") && file.encryptedData.isNotBlank()) {
+                val bitmap = remember(file.encryptedData) {
+                    try {
+                        val bytes = Base64.decode(file.encryptedData, Base64.NO_WRAP)
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                if (bitmap != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = file.fileName,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .background(VaultBgSurface, RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                }
             }
         }
     }
