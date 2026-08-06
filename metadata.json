@@ -1,0 +1,8 @@
+{
+  "name": "Personal Vault",
+  "description": "Secure, encrypted local storage for passwords, documents, and sensitive information. Fully offline, zero-knowledge.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
