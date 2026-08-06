@@ -18,6 +18,7 @@ import com.example.personalvault.ui.theme.*
 
 @Composable
 fun RecoveryScreen(
+    recoveryEmailHint: String = "",
     onRecover: (recoveryKey: String) -> Unit,
     onBackToLock: () -> Unit
 ) {
@@ -62,13 +63,46 @@ fun RecoveryScreen(
                     text = "Enter your 16-character recovery key (e.g. A1B2-C3D4-E5F6-7890)",
                     fontSize = 13.sp,
                     color = TextSecondary,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
                 )
+
+                if (recoveryEmailHint.isNotBlank()) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = VaultBgPrimary),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Recovery Hint:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentSecondary
+                            )
+                            Text(
+                                text = recoveryEmailHint,
+                                fontSize = 13.sp,
+                                color = TextPrimary,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = recoveryKey,
-                    onValueChange = { recoveryKey = it },
-                    label = { Text("Recovery Key") },
+                    onValueChange = { input ->
+                        // Clean input and format cleanly as UPPERCASE
+                        val clean = input.filter { it.isLetterOrDigit() }.uppercase()
+                        recoveryKey = if (clean.length <= 16) {
+                            clean.chunked(4).joinToString("-")
+                        } else {
+                            input.trim().uppercase()
+                        }
+                    },
+                    label = { Text("16-Character Recovery Key") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                     modifier = Modifier.fillMaxWidth(),

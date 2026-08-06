@@ -115,7 +115,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val phrase = repository.setupVault(password, emailHint)
                 _generatedRecoveryPhrase.value = phrase
-                _screen.value = AppScreen.MAIN
+                _screen.value = AppScreen.SETUP
                 showToast("Vault setup successfully! Keep your recovery key safe.")
             } catch (e: Exception) {
                 showToast("Failed to setup vault: ${e.localizedMessage}")
@@ -123,6 +123,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun completeSetupAndEnterVault() {
+        _generatedRecoveryPhrase.value = null
+        _screen.value = AppScreen.MAIN
     }
 
     fun unlockVault(password: String) {
@@ -269,6 +274,18 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun regenerateRecoveryKey(onKeyGenerated: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val newKey = repository.regenerateRecoveryKey()
+                onKeyGenerated(newKey)
+                showToast("New Recovery Key generated")
+            } catch (e: Exception) {
+                showToast("Error generating recovery key: ${e.localizedMessage}")
+            }
+        }
+    }
+
     fun exportBackup(onExportReady: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -298,6 +315,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 BiometricAuthManager.clearBiometricData(context)
             }
             repository.wipeVault()
+            _generatedRecoveryPhrase.value = null
             _screen.value = AppScreen.SETUP
             closeSettings()
             showToast("Vault reset. Setup a new master password.")

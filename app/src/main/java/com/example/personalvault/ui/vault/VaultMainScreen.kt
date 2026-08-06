@@ -58,6 +58,7 @@ fun VaultMainScreen(
             onEnableBiometric = { masterPwd -> viewModel.enableBiometric(context, masterPwd) },
             onDisableBiometric = { viewModel.disableBiometric(context) },
             onChangePassword = { newPwd -> viewModel.changePassword(newPwd, context) },
+            onRegenerateRecoveryKey = { callback -> viewModel.regenerateRecoveryKey(callback) },
             onExportBackup = { viewModel.exportBackup(it) },
             onImportBackup = { viewModel.importBackup(it) },
             onWipeVault = { viewModel.wipeVault(context) },

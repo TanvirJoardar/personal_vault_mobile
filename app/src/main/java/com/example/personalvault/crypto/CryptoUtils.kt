@@ -91,10 +91,23 @@ object CryptoUtils {
     }
 
     fun generateRecoveryPhrase(): String {
-        val bytes = ByteArray(16)
+        val bytes = ByteArray(8)
         random.nextBytes(bytes)
         val hex = bytes.joinToString("") { "%02X".format(it) }
         return hex.chunked(4).joinToString("-")
+    }
+
+    fun normalizeRecoveryKey(input: String): String {
+        val clean = input.filter { it.isLetterOrDigit() }.uppercase()
+        return if (clean.length == 16) {
+            clean.chunked(4).joinToString("-")
+        } else {
+            clean
+        }
+    }
+
+    fun cleanRecoveryKeyRaw(input: String): String {
+        return input.filter { it.isLetterOrDigit() }.uppercase()
     }
 
     fun generatePassword(

@@ -49,8 +49,9 @@ class VaultRepository(private val dao: VaultDao) {
         val (encVK, encVKIV) = CryptoUtils.encryptVaultKey(vaultKeyRaw, passwordWrappingKey)
 
         val recoveryPhrase = CryptoUtils.generateRecoveryPhrase()
+        val normalizedRecoveryPhrase = CryptoUtils.normalizeRecoveryKey(recoveryPhrase)
         val recoverySalt = CryptoUtils.generateSalt()
-        val recoveryWrappingKey = CryptoUtils.deriveKey(recoveryPhrase, recoverySalt)
+        val recoveryWrappingKey = CryptoUtils.deriveKey(normalizedRecoveryPhrase, recoverySalt)
         val (recEncVK, recEncVKIV) = CryptoUtils.encryptVaultKey(vaultKeyRaw, recoveryWrappingKey)
 
         val meta = VaultMetaEntity(
@@ -89,20 +90,48 @@ class VaultRepository(private val dao: VaultDao) {
 
     suspend fun recoverVault(recoveryKeyInput: String): Boolean {
         val meta = dao.getVaultMetaDirect() ?: return false
-        val formattedKey = recoveryKeyInput.trim().uppercase()
-        return try {
-            val recoverySalt = CryptoUtils.fromBase64(meta.recoverySalt)
-            val recoveryWrappingKey = CryptoUtils.deriveKey(formattedKey, recoverySalt)
-            val vaultKey = CryptoUtils.decryptVaultKey(
-                meta.recoveryEncryptedVaultKey,
-                meta.recoveryEncryptedVaultKeyIV,
-                recoveryWrappingKey
-            )
-            activeVaultKey = vaultKey
-            true
-        } catch (e: Exception) {
-            false
+        val recoverySalt = CryptoUtils.fromBase64(meta.recoverySalt)
+
+        val formattedKey = CryptoUtils.normalizeRecoveryKey(recoveryKeyInput)
+        val cleanKey = CryptoUtils.cleanRecoveryKeyRaw(recoveryKeyInput)
+        val legacyRaw = recoveryKeyInput.trim().uppercase()
+
+        val candidates = listOf(formattedKey, cleanKey, legacyRaw).distinct()
+
+        for (candidate in candidates) {
+            try {
+                val recoveryWrappingKey = CryptoUtils.deriveKey(candidate, recoverySalt)
+                val vaultKey = CryptoUtils.decryptVaultKey(
+                    meta.recoveryEncryptedVaultKey,
+                    meta.recoveryEncryptedVaultKeyIV,
+                    recoveryWrappingKey
+                )
+                activeVaultKey = vaultKey
+                return true
+            } catch (e: Exception) {
+                // try next candidate
+            }
         }
+        return false
+    }
+
+    suspend fun regenerateRecoveryKey(): String {
+        val key = activeVaultKey ?: throw IllegalStateException("Vault is locked")
+        val meta = dao.getVaultMetaDirect() ?: throw IllegalStateException("No vault metadata")
+
+        val newRecoveryPhrase = CryptoUtils.generateRecoveryPhrase()
+        val normalizedPhrase = CryptoUtils.normalizeRecoveryKey(newRecoveryPhrase)
+        val newRecoverySalt = CryptoUtils.generateSalt()
+        val recoveryWrappingKey = CryptoUtils.deriveKey(normalizedPhrase, newRecoverySalt)
+        val (recEncVK, recEncVKIV) = CryptoUtils.encryptVaultKey(key.encoded, recoveryWrappingKey)
+
+        val updatedMeta = meta.copy(
+            recoverySalt = CryptoUtils.toBase64(newRecoverySalt),
+            recoveryEncryptedVaultKey = recEncVK,
+            recoveryEncryptedVaultKeyIV = recEncVKIV
+        )
+        dao.saveVaultMeta(updatedMeta)
+        return newRecoveryPhrase
     }
 
     fun lockVault() {

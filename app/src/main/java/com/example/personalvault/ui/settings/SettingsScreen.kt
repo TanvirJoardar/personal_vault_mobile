@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -36,6 +37,7 @@ fun SettingsScreen(
     onEnableBiometric: (masterPassword: String) -> Unit,
     onDisableBiometric: () -> Unit,
     onChangePassword: (String) -> Unit,
+    onRegenerateRecoveryKey: ((String) -> Unit) -> Unit = {},
     onExportBackup: ((String) -> Unit) -> Unit,
     onImportBackup: (String) -> Unit,
     onWipeVault: () -> Unit,
@@ -43,6 +45,8 @@ fun SettingsScreen(
 ) {
     var showChangePassDialog by remember { mutableStateOf(false) }
     var showEnableBiometricDialog by remember { mutableStateOf(false) }
+    var showRecoveryKeyDialog by remember { mutableStateOf(false) }
+    var generatedRecoveryKeyText by remember { mutableStateOf<String?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
@@ -161,6 +165,23 @@ fun SettingsScreen(
                         Icon(Icons.Default.LockReset, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Change Master Password")
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            onRegenerateRecoveryKey { newKey ->
+                                generatedRecoveryKeyText = newKey
+                                showRecoveryKeyDialog = true
+                            }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentSecondary),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View / Generate 16-Char Recovery Key")
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -333,6 +354,78 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showChangePassDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // View / Regenerate Recovery Key Dialog
+    if (showRecoveryKeyDialog && generatedRecoveryKeyText != null) {
+        AlertDialog(
+            onDismissRequest = { showRecoveryKeyDialog = false },
+            containerColor = VaultBgSurface,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Key, contentDescription = null, tint = AccentSecondary, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Master Recovery Key", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "Here is your 16-character Master Recovery Key. Store this key in a secure location! You can use it to unlock your vault if you ever forget your master password.",
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = VaultBgPrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = generatedRecoveryKeyText!!,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                letterSpacing = 1.5.sp
+                            )
+                            IconButton(onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Master Recovery Key", generatedRecoveryKeyText!!))
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy Recovery Key",
+                                    tint = AccentSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Master Recovery Key", generatedRecoveryKeyText!!))
+                    showRecoveryKeyDialog = false
+                }) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Copy & Done")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRecoveryKeyDialog = false }) {
+                    Text("Close")
                 }
             }
         )

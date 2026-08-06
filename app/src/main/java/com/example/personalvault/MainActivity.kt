@@ -75,7 +75,7 @@ fun VaultAppContent(viewModel: VaultViewModel) {
                 SetupScreen(
                     recoveryPhrase = recoveryPhrase,
                     onSetup = { pwd, hint -> viewModel.setupVault(pwd, hint) },
-                    onContinue = { viewModel.unlockVault("") }
+                    onContinue = { viewModel.completeSetupAndEnterVault() }
                 )
             }
 
@@ -90,6 +90,7 @@ fun VaultAppContent(viewModel: VaultViewModel) {
 
             AppScreen.RECOVERY -> {
                 RecoveryScreen(
+                    recoveryEmailHint = meta?.recoveryEmailHint ?: "",
                     onRecover = { key -> viewModel.recoverVault(key) },
                     onBackToLock = { viewModel.navigateToLock() }
                 )
