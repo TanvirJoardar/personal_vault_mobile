@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/vault_logo_1786007675404"
+        android:drawable="@drawable/personal_vault"
         android:gravity="center" />
 </layer-list>
