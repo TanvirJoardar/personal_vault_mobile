@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -171,9 +172,9 @@ fun VaultMainScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text("Personal Vault", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                                Text("Zero-Knowledge Storage", fontSize = 10.sp, color = TextSecondary)
+                            Column(verticalArrangement = Arrangement.spacedBy((1).dp)) {
+                                Text("Personal Vault", fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 18.sp, color = TextPrimary)
+                                Text("Zero-Knowledge Storage", fontSize = 10.sp, lineHeight = 12.sp, color = TextSecondary)
                             }
                         }
                     },
@@ -236,7 +237,19 @@ fun VaultMainScreen(
             )
 
             // Section Filter Chips
+            val filterListState = rememberLazyListState()
+            val filterTargetIndex = remember(selectedSection) {
+                if (selectedSection == null) 0
+                else SectionType.values().indexOf(selectedSection) + 1
+            }
+            LaunchedEffect(filterTargetIndex) {
+                if (filterTargetIndex >= 0) {
+                    filterListState.animateScrollToItem(filterTargetIndex)
+                }
+            }
+
             LazyRow(
+                state = filterListState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),

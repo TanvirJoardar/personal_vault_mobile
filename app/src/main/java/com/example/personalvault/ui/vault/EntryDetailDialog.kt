@@ -95,14 +95,24 @@ fun EntryDetailDialog(
                         DetailItem("Password", entry.passwordValue, context, isSensitive = true, isHidden = !showSensitiveData)
                         DetailItem("URL", entry.url, context)
                         if (entry.signInProvider != SignInProvider.NONE) {
-                            DetailItem("Sign-in Method", entry.signInProvider.name.lowercase().replaceFirstChar { it.uppercase() }, context)
+                            val providerStr = if (entry.signInProvider == SignInProvider.CUSTOM) {
+                                entry.customSignInProvider.ifBlank { "Custom" }
+                            } else {
+                                entry.signInProvider.name.lowercase().replaceFirstChar { it.uppercase() }
+                            }
+                            DetailItem("Sign-in Method", providerStr, context)
                         }
                         DetailItem("Additional Info / Notes", entry.additionalInfo, context)
                         RenderAttachments(entry.attachments)
                     }
                     is VaultEntry.Document -> {
                         DetailItem("Document Name", entry.documentName, context)
-                        DetailItem("Type", entry.documentType.name, context)
+                        val docTypeStr = if (entry.documentType == DocumentType.CUSTOM) {
+                            entry.customDocumentType.ifBlank { "Custom" }
+                        } else {
+                            entry.documentType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+                        }
+                        DetailItem("Type", docTypeStr, context)
                         DetailItem("Description", entry.description, context)
                         if (entry.tags.isNotEmpty()) {
                             DetailItem("Tags", entry.tags.joinToString(", "), context)
@@ -113,12 +123,24 @@ fun EntryDetailDialog(
                         DetailItem("License Name", entry.licenseName, context)
                         DetailItem("Holder Name", entry.holderName, context)
                         DetailItem("License Number", entry.licenseNumber, context, isSensitive = true, isHidden = !showSensitiveData)
+                        val licTypeStr = if (entry.licenseType == LicenseType.CUSTOM) {
+                            entry.customLicenseType.ifBlank { "Custom" }
+                        } else {
+                            entry.licenseType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+                        }
+                        DetailItem("License Type", licTypeStr, context)
                         DetailItem("Issue Date", entry.issueDate, context)
                         DetailItem("Expiry Date", entry.expiryDate, context)
                         RenderAttachments(entry.files)
                     }
                     is VaultEntry.Certificate -> {
                         DetailItem("Certificate Name", entry.certificateName, context)
+                        val certTypeStr = if (entry.certificateType == CertificateType.CUSTOM) {
+                            entry.customCertificateType.ifBlank { "Custom" }
+                        } else {
+                            entry.certificateType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+                        }
+                        DetailItem("Certificate Type", certTypeStr, context)
                         DetailItem("Institution", entry.institutionName, context)
                         DetailItem("Completion Year", entry.yearOfCompletion, context)
                         DetailItem("Description", entry.description, context)
@@ -126,7 +148,12 @@ fun EntryDetailDialog(
                     }
                     is VaultEntry.IdCard -> {
                         DetailItem("ID Name", entry.cardName, context)
-                        DetailItem("Card Type", entry.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, context)
+                        val idTypeStr = if (entry.cardType == IdCardType.CUSTOM) {
+                            entry.customCardType.ifBlank { "Custom" }
+                        } else {
+                            entry.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+                        }
+                        DetailItem("Card Type", idTypeStr, context)
                         DetailItem("Holder Name", entry.holderName, context)
                         DetailItem("Card Number", entry.cardNumber, context, isSensitive = true, isHidden = !showSensitiveData)
                         DetailItem("Issue Date", entry.issueDate, context)
@@ -136,7 +163,12 @@ fun EntryDetailDialog(
                     }
                     is VaultEntry.Bank -> {
                         DetailItem("Bank Name", entry.bankName, context)
-                        DetailItem("Account Type", entry.bankType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, context)
+                        val bankTypeStr = if (entry.bankType == BankAccountType.CUSTOM) {
+                            entry.customBankType.ifBlank { "Custom" }
+                        } else {
+                            entry.bankType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+                        }
+                        DetailItem("Account Type", bankTypeStr, context)
                         DetailItem("Branch Name", entry.branchName, context)
                         DetailItem("Account Number", entry.accountNumber, context, isSensitive = true, isHidden = !showSensitiveData)
                         DetailItem("Account Holder", entry.accountHolderName, context)
@@ -156,7 +188,12 @@ fun EntryDetailDialog(
                                         .background(VaultBgCard, RoundedCornerShape(10.dp))
                                         .padding(10.dp)
                                 ) {
-                                    Text("Card #${index + 1} (${card.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }})", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
+                                    val cardTypeStr = if (card.cardType == BankCardType.CUSTOM) {
+                                        card.customCardType.ifBlank { "Custom" }
+                                    } else {
+                                        card.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+                                    }
+                                    Text("Card #${index + 1} ($cardTypeStr)", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
                                     DetailItem("Card Number", card.cardNumber, context, isSensitive = true, isHidden = !showSensitiveData)
                                     DetailItem("PIN", card.pin, context, isSensitive = true, isHidden = !showSensitiveData)
                                     DetailItem("CVV", card.cvv, context, isSensitive = true, isHidden = !showSensitiveData)

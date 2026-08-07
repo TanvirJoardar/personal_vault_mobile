@@ -8,6 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -55,6 +58,7 @@ fun EntryFormDialog(
     var passwordValue by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.passwordValue ?: "") }
     var passwordUrl by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.url ?: "") }
     var passwordProvider by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.signInProvider ?: SignInProvider.NONE) }
+    var customPasswordProvider by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.customSignInProvider ?: "") }
     var passwordCategory by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.category ?: "General") }
     var passwordIsFavorite by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.isFavorite ?: false) }
     var passwordNotes by remember { mutableStateOf((editingEntry as? VaultEntry.Password)?.additionalInfo ?: "") }
@@ -63,6 +67,7 @@ fun EntryFormDialog(
     // Document Fields
     var docName by remember { mutableStateOf((editingEntry as? VaultEntry.Document)?.documentName ?: "") }
     var docType by remember { mutableStateOf((editingEntry as? VaultEntry.Document)?.documentType ?: DocumentType.OTHER) }
+    var customDocType by remember { mutableStateOf((editingEntry as? VaultEntry.Document)?.customDocumentType ?: "") }
     var docDesc by remember { mutableStateOf((editingEntry as? VaultEntry.Document)?.description ?: "") }
     var docTags by remember { mutableStateOf((editingEntry as? VaultEntry.Document)?.tags?.joinToString(", ") ?: "") }
 
@@ -71,12 +76,14 @@ fun EntryFormDialog(
     var licHolder by remember { mutableStateOf((editingEntry as? VaultEntry.DrivingLicense)?.holderName ?: "") }
     var licNumber by remember { mutableStateOf((editingEntry as? VaultEntry.DrivingLicense)?.licenseNumber ?: "") }
     var licType by remember { mutableStateOf((editingEntry as? VaultEntry.DrivingLicense)?.licenseType ?: LicenseType.NON_PROFESSIONAL) }
+    var customLicType by remember { mutableStateOf((editingEntry as? VaultEntry.DrivingLicense)?.customLicenseType ?: "") }
     var licIssue by remember { mutableStateOf((editingEntry as? VaultEntry.DrivingLicense)?.issueDate ?: "") }
     var licExpiry by remember { mutableStateOf((editingEntry as? VaultEntry.DrivingLicense)?.expiryDate ?: "") }
 
     // Certificate Fields
     var certName by remember { mutableStateOf((editingEntry as? VaultEntry.Certificate)?.certificateName ?: "") }
     var certType by remember { mutableStateOf((editingEntry as? VaultEntry.Certificate)?.certificateType ?: CertificateType.OTHER) }
+    var customCertType by remember { mutableStateOf((editingEntry as? VaultEntry.Certificate)?.customCertificateType ?: "") }
     var certInst by remember { mutableStateOf((editingEntry as? VaultEntry.Certificate)?.institutionName ?: "") }
     var certYear by remember { mutableStateOf((editingEntry as? VaultEntry.Certificate)?.yearOfCompletion ?: "") }
     var certDesc by remember { mutableStateOf((editingEntry as? VaultEntry.Certificate)?.description ?: "") }
@@ -84,6 +91,7 @@ fun EntryFormDialog(
     // ID Card Fields
     var idName by remember { mutableStateOf((editingEntry as? VaultEntry.IdCard)?.cardName ?: "") }
     var idType by remember { mutableStateOf((editingEntry as? VaultEntry.IdCard)?.cardType ?: IdCardType.NATIONAL_ID) }
+    var customIdType by remember { mutableStateOf((editingEntry as? VaultEntry.IdCard)?.customCardType ?: "") }
     var idNumber by remember { mutableStateOf((editingEntry as? VaultEntry.IdCard)?.cardNumber ?: "") }
     var idHolder by remember { mutableStateOf((editingEntry as? VaultEntry.IdCard)?.holderName ?: "") }
     var idIssue by remember { mutableStateOf((editingEntry as? VaultEntry.IdCard)?.issueDate ?: "") }
@@ -93,6 +101,7 @@ fun EntryFormDialog(
     // Bank Fields
     var bankName by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.bankName ?: "") }
     var bankType by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.bankType ?: BankAccountType.SAVINGS) }
+    var customBankType by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.customBankType ?: "") }
     var bankBranch by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.branchName ?: "") }
     var bankAccountNum by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.accountNumber ?: "") }
     var bankHolder by remember { mutableStateOf((editingEntry as? VaultEntry.Bank)?.accountHolderName ?: "") }
@@ -270,14 +279,24 @@ fun EntryFormDialog(
                 if (editingEntry == null) {
                     // Category selector chips
                     Text("Select Category", fontSize = 12.sp, color = TextSecondary)
-                    Row(
+                    val categoryListState = rememberLazyListState()
+                    val targetCategoryIdx = remember(selectedSection) {
+                        SectionType.values().indexOf(selectedSection)
+                    }
+                    LaunchedEffect(targetCategoryIdx) {
+                        if (targetCategoryIdx >= 0) {
+                            categoryListState.animateScrollToItem(targetCategoryIdx)
+                        }
+                    }
+
+                    LazyRow(
+                        state = categoryListState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
                             .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        SectionType.values().forEach { sec ->
+                        items(SectionType.values()) { sec ->
                             FilterChip(
                                 selected = selectedSection == sec,
                                 onClick = { selectedSection = sec },
@@ -368,6 +387,7 @@ fun EntryFormDialog(
                                                 SignInProvider.MICROSOFT -> "Microsoft"
                                                 SignInProvider.FACEBOOK -> "Facebook"
                                                 SignInProvider.APPLE -> "Apple"
+                                                SignInProvider.CUSTOM -> "Custom"
                                             },
                                             fontSize = 11.sp
                                         )
@@ -378,6 +398,17 @@ fun EntryFormDialog(
                                     )
                                 )
                             }
+                        }
+                        if (passwordProvider == SignInProvider.CUSTOM) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = customPasswordProvider,
+                                onValueChange = { customPasswordProvider = it },
+                                label = { Text("Custom Sign-in Method") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -421,13 +452,24 @@ fun EntryFormDialog(
                                 FilterChip(
                                     selected = docType == type,
                                     onClick = { docType = type },
-                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    label = { Text(if (type == DocumentType.CUSTOM) "Custom" else type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = AccentPrimary,
                                         selectedLabelColor = TextPrimary
                                     )
                                 )
                             }
+                        }
+                        if (docType == DocumentType.CUSTOM) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = customDocType,
+                                onValueChange = { customDocType = it },
+                                label = { Text("Custom Document Type") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -488,13 +530,24 @@ fun EntryFormDialog(
                                 FilterChip(
                                     selected = licType == type,
                                     onClick = { licType = type },
-                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    label = { Text(if (type == LicenseType.CUSTOM) "Custom" else type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = AccentPrimary,
                                         selectedLabelColor = TextPrimary
                                     )
                                 )
                             }
+                        }
+                        if (licType == LicenseType.CUSTOM) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = customLicType,
+                                onValueChange = { customLicType = it },
+                                label = { Text("Custom License Type") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -539,13 +592,24 @@ fun EntryFormDialog(
                                 FilterChip(
                                     selected = certType == type,
                                     onClick = { certType = type },
-                                    label = { Text(type.name, fontSize = 11.sp) },
+                                    label = { Text(if (type == CertificateType.CUSTOM) "Custom" else type.name, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = AccentPrimary,
                                         selectedLabelColor = TextPrimary
                                     )
                                 )
                             }
+                        }
+                        if (certType == CertificateType.CUSTOM) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = customCertType,
+                                onValueChange = { customCertType = it },
+                                label = { Text("Custom Certificate Type") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -599,13 +663,24 @@ fun EntryFormDialog(
                                 FilterChip(
                                     selected = idType == type,
                                     onClick = { idType = type },
-                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    label = { Text(if (type == IdCardType.CUSTOM) "Custom" else type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = AccentPrimary,
                                         selectedLabelColor = TextPrimary
                                     )
                                 )
                             }
+                        }
+                        if (idType == IdCardType.CUSTOM) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = customIdType,
+                                onValueChange = { customIdType = it },
+                                label = { Text("Custom Card Type") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -679,13 +754,24 @@ fun EntryFormDialog(
                                 FilterChip(
                                     selected = bankType == type,
                                     onClick = { bankType = type },
-                                    label = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
+                                    label = { Text(if (type == BankAccountType.CUSTOM) "Custom" else type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = AccentPrimary,
                                         selectedLabelColor = TextPrimary
                                     )
                                 )
                             }
+                        }
+                        if (bankType == BankAccountType.CUSTOM) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = customBankType,
+                                onValueChange = { customBankType = it },
+                                label = { Text("Custom Account Type") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -854,7 +940,7 @@ fun EntryFormDialog(
                                         var expanded by remember { mutableStateOf(false) }
                                         Box(modifier = Modifier.weight(1f)) {
                                             OutlinedTextField(
-                                                value = card.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+                                                value = if (card.cardType == BankCardType.CUSTOM) (card.customCardType.ifBlank { "Custom" }) else card.cardType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
                                                 onValueChange = {},
                                                 readOnly = true,
                                                 label = { Text("Card Type") },
@@ -875,7 +961,7 @@ fun EntryFormDialog(
                                             ) {
                                                 BankCardType.values().forEach { type ->
                                                     DropdownMenuItem(
-                                                        text = { Text(type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }) },
+                                                        text = { Text(if (type == BankCardType.CUSTOM) "Custom" else type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }) },
                                                         onClick = {
                                                             bankCards = bankCards.toMutableList().apply {
                                                                 this[index] = card.copy(cardType = type)
@@ -929,6 +1015,22 @@ fun EntryFormDialog(
                                             placeholder = { Text("...") },
                                             singleLine = true,
                                             modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                    }
+
+                                    if (card.cardType == BankCardType.CUSTOM) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        OutlinedTextField(
+                                            value = card.customCardType,
+                                            onValueChange = { newCustom ->
+                                                bankCards = bankCards.toMutableList().apply {
+                                                    this[index] = card.copy(customCardType = newCustom)
+                                                }
+                                            },
+                                            label = { Text("Custom Card Type") },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(12.dp)
                                         )
                                     }
@@ -1091,6 +1193,7 @@ fun EntryFormDialog(
                                 passwordValue = passwordValue,
                                 url = passwordUrl,
                                 signInProvider = passwordProvider,
+                                customSignInProvider = customPasswordProvider,
                                 category = passwordCategory,
                                 isFavorite = passwordIsFavorite,
                                 additionalInfo = passwordNotes,
@@ -1105,6 +1208,7 @@ fun EntryFormDialog(
                                 updatedAt = System.currentTimeMillis(),
                                 documentName = docName,
                                 documentType = docType,
+                                customDocumentType = customDocType,
                                 description = docDesc,
                                 tags = docTags.split(",").map { it.trim() }.filter { it.isNotEmpty() },
                                 files = attachedFiles
@@ -1120,6 +1224,7 @@ fun EntryFormDialog(
                                 holderName = licHolder,
                                 licenseNumber = licNumber,
                                 licenseType = licType,
+                                customLicenseType = customLicType,
                                 issueDate = licIssue,
                                 expiryDate = licExpiry,
                                 files = attachedFiles
@@ -1133,6 +1238,7 @@ fun EntryFormDialog(
                                 updatedAt = System.currentTimeMillis(),
                                 certificateName = certName,
                                 certificateType = certType,
+                                customCertificateType = customCertType,
                                 institutionName = certInst,
                                 yearOfCompletion = certYear,
                                 description = certDesc,
@@ -1147,6 +1253,7 @@ fun EntryFormDialog(
                                 updatedAt = System.currentTimeMillis(),
                                 cardName = idName,
                                 cardType = idType,
+                                customCardType = customIdType,
                                 cardNumber = idNumber,
                                 holderName = idHolder,
                                 issueDate = idIssue,
@@ -1164,6 +1271,7 @@ fun EntryFormDialog(
                                     updatedAt = System.currentTimeMillis(),
                                     bankName = bankName,
                                     bankType = bankType,
+                                    customBankType = customBankType,
                                     branchName = bankBranch,
                                     accountNumber = bankAccountNum,
                                     accountHolderName = bankHolder,

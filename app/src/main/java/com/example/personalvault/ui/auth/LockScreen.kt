@@ -154,7 +154,7 @@ fun LockScreen(
                     ) {
                         Icon(Icons.Default.Fingerprint, contentDescription = "Biometric Unlock", modifier = Modifier.size(22.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Unlock with Biometrics (Fingerprint / Face)", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Unlock with Fingerprint", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 

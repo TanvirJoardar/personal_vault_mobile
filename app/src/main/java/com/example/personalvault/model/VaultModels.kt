@@ -30,43 +30,44 @@ data class EncryptedFileAttachment(
 
 @Serializable
 enum class SignInProvider {
-    NONE, GOOGLE, MICROSOFT, FACEBOOK, APPLE
+    NONE, GOOGLE, MICROSOFT, FACEBOOK, APPLE, CUSTOM
 }
 
 @Serializable
 enum class DocumentType {
-    AGREEMENT, INVOICE, RECEIPT, CONTRACT, LEGAL, MEDICAL, TAX, INSURANCE, OTHER
+    AGREEMENT, INVOICE, RECEIPT, CONTRACT, LEGAL, MEDICAL, TAX, INSURANCE, OTHER, CUSTOM
 }
 
 @Serializable
 enum class LicenseType {
-    PROFESSIONAL, NON_PROFESSIONAL, INTERNATIONAL, LEARNER, OTHER
+    PROFESSIONAL, NON_PROFESSIONAL, INTERNATIONAL, LEARNER, OTHER, CUSTOM
 }
 
 @Serializable
 enum class CertificateType {
-    SSC, HSC, UNIVERSITY, MASTERS, PHD, PROFESSIONAL, DIPLOMA, OTHER
+    SSC, HSC, UNIVERSITY, MASTERS, PHD, PROFESSIONAL, DIPLOMA, OTHER, CUSTOM
 }
 
 @Serializable
 enum class IdCardType {
-    NATIONAL_ID, SCHOOL_ID, COLLEGE_ID, UNIVERSITY_ID, JOB_ID, VOTER_ID, PASSPORT, OTHER
+    NATIONAL_ID, SCHOOL_ID, COLLEGE_ID, UNIVERSITY_ID, JOB_ID, VOTER_ID, PASSPORT, OTHER, CUSTOM
 }
 
 @Serializable
 enum class BankAccountType {
-    SAVINGS, CURRENT, FIXED_DEPOSIT, DPS, LOAN, OTHER
+    SAVINGS, CURRENT, FIXED_DEPOSIT, DPS, LOAN, OTHER, CUSTOM
 }
 
 @Serializable
 enum class BankCardType {
-    VISA, MASTERCARD, DEBIT, CREDIT, PREPAID, OTHER
+    VISA, MASTERCARD, DEBIT, CREDIT, PREPAID, OTHER, CUSTOM
 }
 
 @Serializable
 data class BankCard(
     val id: String = java.util.UUID.randomUUID().toString(),
     val cardType: BankCardType = BankCardType.DEBIT,
+    val customCardType: String = "",
     val cardNumber: String = "",
     val cardHolderName: String = "",
     val expiryDate: String = "",
@@ -95,6 +96,7 @@ sealed class VaultEntry {
         val url: String = "",
         val additionalInfo: String = "",
         val signInProvider: SignInProvider = SignInProvider.NONE,
+        val customSignInProvider: String = "",
         val category: String = "General",
         val isFavorite: Boolean = false,
         val attachments: List<EncryptedFileAttachment> = emptyList()
@@ -110,6 +112,7 @@ sealed class VaultEntry {
         override val updatedAt: Long = System.currentTimeMillis(),
         val documentName: String,
         val documentType: DocumentType = DocumentType.OTHER,
+        val customDocumentType: String = "",
         val description: String = "",
         val tags: List<String> = emptyList(),
         val files: List<EncryptedFileAttachment> = emptyList()
@@ -127,6 +130,7 @@ sealed class VaultEntry {
         val holderName: String = "",
         val licenseNumber: String = "",
         val licenseType: LicenseType = LicenseType.NON_PROFESSIONAL,
+        val customLicenseType: String = "",
         val issueDate: String = "",
         val expiryDate: String = "",
         val files: List<EncryptedFileAttachment> = emptyList()
@@ -142,6 +146,7 @@ sealed class VaultEntry {
         override val updatedAt: Long = System.currentTimeMillis(),
         val certificateName: String,
         val certificateType: CertificateType = CertificateType.OTHER,
+        val customCertificateType: String = "",
         val institutionName: String = "",
         val description: String = "",
         val yearOfCompletion: String = "",
@@ -158,6 +163,7 @@ sealed class VaultEntry {
         override val updatedAt: Long = System.currentTimeMillis(),
         val cardName: String,
         val cardType: IdCardType = IdCardType.NATIONAL_ID,
+        val customCardType: String = "",
         val cardNumber: String = "",
         val holderName: String = "",
         val description: String = "",
@@ -176,6 +182,7 @@ sealed class VaultEntry {
         override val updatedAt: Long = System.currentTimeMillis(),
         val bankName: String,
         val bankType: BankAccountType = BankAccountType.SAVINGS,
+        val customBankType: String = "",
         val branchName: String = "",
         val accountNumber: String = "",
         val accountHolderName: String = "",
